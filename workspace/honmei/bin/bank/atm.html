@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>ATM システム</title>
+<style>
+  body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f1f1f1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+
+  .atm-container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    width: 350px;
+    text-align: center;
+    position: relative;
+  }
+
+  h1 {
+    margin-bottom: 20px;
+    color: #333;
+  }
+
+  .card-slot {
+    width: 200px;
+    height: 60px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    margin: 0 auto 15px;
+    position: relative;
+    background-color: #eee;
+    overflow: hidden;
+  }
+
+  .card {
+  width: 180px;
+  height: 50px;
+  background-color: #4CAF50;
+  border-radius: 6px;
+  position: absolute;
+  bottom: -60px; /* スロットの下に隠す */
+  left: 10px;
+  color: white;
+  font-weight: bold;
+  line-height: 50px;
+  text-align: center;
+  user-select: none;
+}
+
+@keyframes slideIn {
+  0% { bottom: -60px; opacity: 1; }
+  100% { bottom: 5px; opacity: 0; } /* 上に動きつつフェードアウト */
+}
+
+.card.inserting {
+  animation: slideIn 1s forwards ease-in-out;
+}
+
+
+  /* カードがスロットに差し込まれるアニメーション */
+  @keyframes slideIn {
+    0% { top: -60px; }
+    100% { top: 5px; }
+  }
+
+  .card.inserting {
+    animation: slideIn 1s forwards ease-in-out;
+  }
+
+  form {
+    display: flex;
+    flex-direction: column;
+    opacity: 0.3;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+
+  form.enabled {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  label {
+    text-align: left;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+
+  input, select {
+    padding: 8px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+  }
+
+  button {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+  }
+
+  button:hover:not(:disabled) {
+    background-color: #45a049;
+  }
+
+  button:disabled {
+    background-color: #9ccc9c;
+    cursor: not-allowed;
+  }
+
+  #message {
+    margin-top: 20px;
+    color: #666;
+    font-size: 14px;
+  }
+
+  .loading {
+    display: none;
+    margin-top: 20px;
+  }
+
+  .loading span {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #4CAF50;
+    margin: 0 3px;
+    border-radius: 50%;
+    animation: bounce 0.6s infinite alternate;
+  }
+
+  .loading span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .loading span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes bounce {
+    to {
+      transform: translateY(-10px);
+    }
+  }
+
+  /* モーダル */
+  .modal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 10;
+  }
+
+  .modal.active {
+    display: flex;
+  }
+
+  .modal-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 8px;
+    width: 280px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    text-align: center;
+    font-size: 16px;
+    color: #333;
+  }
+
+  .modal-content button {
+    margin-top: 15px;
+    width: 100%;
+  }
+
+  .insert-btn {
+    margin: 0 auto 20px;
+    display: block;
+    background-color: #0066cc;
+    border: none;
+    padding: 10px 15px;
+    color: white;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+
+  .insert-btn:hover {
+    background-color: #005bb5;
+  }
+</style>
+</head>
+<body>
+  <div class="atm-container">
+    <h1>ATM システム</h1>
+
+    <div class="card-slot">
+      <div class="card" id="card">カード</div>
+    </div>
+
+    <button class="insert-btn" id="insertBtn">カードを挿入</button>
+
+    <form id="atmForm">
+      <label for="operation">操作を選択：</label>
+      <select id="operation" name="operation" required>
+        <option value="deposit">預け入れ</option>
+        <option value="withdraw">引き出し</option>
+      </select>
+
+      <label for="amount">金額：</label>
+      <input type="number" id="amount" name="amount" min="1" required />
+
+      <label for="password">暗証番号：</label>
+      <input type="password" id="password" name="password" maxlength="4" required />
+
+      <button type="submit">実行</button>
+    </form>
+
+    <div class="loading" id="loading">
+      <span></span><span></span><span></span>
+    </div>
+
+    <p id="message">※ 初期残高は 50000円、暗証番号は「0906」です。</p>
+  </div>
+
+  <div class="modal" id="balanceModal">
+    <div class="modal-content">
+      <p id="balanceText"></p>
+      <button id="closeModalBtn">閉じる</button>
+    </div>
+  </div>
+
+  <script>
+    const insertBtn = document.getElementById("insertBtn");
+    const card = document.getElementById("card");
+    const atmForm = document.getElementById("atmForm");
+    const loading = document.getElementById("loading");
+    const balanceModal = document.getElementById("balanceModal");
+    const balanceText = document.getElementById("balanceText");
+    const closeModalBtn = document.getElementById("closeModalBtn");
+
+    let balance = 50000;
+
+    // 初期状態はフォーム操作不可
+    atmForm.classList.remove("enabled");
+    atmForm.querySelector("button[type='submit']").disabled = true;
+
+    insertBtn.addEventListener("click", () => {
+      // カードにアニメーション用クラスをつける
+      card.classList.add("inserting");
+
+      // ボタンを無効化して隠す（アニメーション終了後に非表示）
+      insertBtn.disabled = true;
+
+      // アニメーション終了後の処理
+      card.addEventListener("animationend", () => {
+  card.style.display = "none"; // アニメーション後に見えなくする
+  insertBtn.style.display = "none";
+  atmForm.classList.add("enabled");
+  atmForm.querySelector("button[type='submit']").disabled = false;
+}, { once: true });
+
+    });
+
+    atmForm.addEventListener("submit", function(event) {
+      event.preventDefault();
+
+      const operation = document.getElementById("operation").value;
+      const amount = parseInt(document.getElementById("amount").value, 10);
+      const password = document.getElementById("password").value;
+
+      loading.style.display = "block";
+
+      setTimeout(() => {
+        loading.style.display = "none";
+
+        if (password !== "0906") {
+          alert("暗証番号が間違っています。");
+          return;
+        }
+
+        if (amount <= 0 || isNaN(amount)) {
+          alert("正しい金額を入力してください。");
+          return;
+        }
+
+        if (operation === "deposit") {
+          balance += amount;
+        //   alert(amount + "円を預け入れました。");
+        } else {
+          if (amount > balance) {
+            alert("預金残高が足りません。");
+            return;
+          }
+          balance -= amount;
+        //   alert(amount + "円を引き出しました。");
+        }
+
+        balanceText.textContent = `現在の残高は ${balance.toLocaleString()} 円です。`;
+        balanceModal.classList.add("active");
+
+        atmForm.reset();
+        document.getElementById("password").value = "";
+      }, 1500);
+    });
+
+    closeModalBtn.addEventListener("click", () => {
+      balanceModal.classList.remove("active");
+    });
+  </script>
+</body>
+</html>
